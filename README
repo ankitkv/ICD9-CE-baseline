@@ -1,0 +1,298 @@
+README for Physionet Project "ICD9 Coding of Discharge Summaries"
+
+When using the file in this project, please cite the following publication:
+
+Perotte A, Pivovarov R, Natarajan K, Weiskopf N, Wood F, Elhadad N. J Am Med Inform Assoc. to appear. doi:10.1136/amiajnl-2013-002159
+
+===================================================================
+
+Table of contents:
+
+I. Prerequisites
+II. Raw dataset description
+III. Data preparation
+IV. Hierarchical and flat SVM training and testing
+V. Evaluation
+VI. License
+
+
+===================================================================
+
+I. Prerequisites
+
+This project was created and tested on a system with the following software installed:
+
+Ubuntu 13.10 64-bit
+Kernel 3.11.0-13
+Python 2.7.5+
+
+Also, the following python libraries are required.  Versions are
+listed, but later versions should also suffice.
+
+numpy 1.7.1
+svmlight 0.4
+matplotlib 1.2.1
+scipy 0.12.0
+
+The svmlight library is available (as 11/20/13) here,
+https://bitbucket.org/wcauchois/pysvmlight, but is also included in
+this package under the svmlight directory.
+
+
+
+II. Raw dataset description
+
+There are 2 files that constitute the raw files for this project:
+
+MIMIC_RAW_DSUMS
+ICD-9_v9.xml
+
+MIMIC_RAW_DSUMS is a flat file containing all of the discharge
+summaries from MIMIC II version 2.6. This is a pipe delimited file
+containing the following columns:
+
+"subject_id"|"hadm_id"|"charttime"|"category"|"title"|"icd9_codes"|"text"
+
+ICD-9_v9.xml is an xml file containing version 9 of the ICD9
+hierarchy.  This file was obtained from the NCBO BioPortal at
+http://bioportal.bioontology.org/ontologies/ICD9CM.
+
+
+
+
+III. Data preparation
+
+There exists a script in the data/ directory called
+"contruct_datasets.py".  This script takes several optional arguments,
+but if you do not have a replacement stopword list, corpus, or icd9
+tree, then it can be called without any parameters and the defaults
+will be assumed. This script will create many files, some of which
+will be needed by the scripts in later steps and others which are
+generally useful but not used in the pipeline.  The following is a
+description of the files created by this script:
+
+MIMIC_vocabulary2 - A list of terms used in modeling the documents.
+All other terms are discarded when constructing the final datasets
+
+MIMIC_FILTERED_DSUMS - Identical to MIMIC_RAW_DSUMS except all
+documents that do not contain any of the terms in the vocabulary are
+removed.
+
+MIMIC_term_counts2 - Converts the text portion of the documents in
+MIMIC_FILTERED_DSUMS into a sparse format.  This is a comma separated
+list of term_index:term_count pairs for the document.
+
+ICD9_descriptions - Descriptions for each of the ICD9 codes for all
+ICD9 codes.
+
+ICD9_parent_child_relations - The parent child relationships for all
+ICD9 codes.
+
+ICD9_parent_child_relations_no_proc - The parent child relationships
+for non-procedural ICD9 codes.
+
+ICD9_descriptions_no_proc - Descriptions for all non-procedural ICD9
+codes.
+
+MIMIC_ICD9_mapping - Mapping between the ICD9 codes and indices that
+will later be used to index the ICD9 codes.
+
+MIMIC_parentTochild - The parent child reltionships for ICD9 codes
+actually used in the MIMIC dataset.
+
+MIMIC_ICD9_codes_no_ancestors - A dataset of only ICD9 codes for the
+MIMIC dataset (from MIMIC_FILTERED_DSUMS) that are actually
+documented.
+
+MIMIC_ICD9_codes - A dataset of only ICD9 codes for the MIMIC datasest
+augmented with the ancestors of each documented code.
+
+training_text.data - A training dataset of text that contains some of
+the rows from MIMIC_term_counts2.  The default split is 90% training,
+10% testing.
+
+testing_text.data - A testing dataset of text that contains some of
+the rows from MIMIC_term_counts2.
+
+training_codes.data - A training dataset of codes (augmented with
+ancestors) to match the documents in training_text.data.
+
+testing_codes.data - A testing dataset of codes (augmented with
+ancestors) to match the documents in testing_text.data.
+
+training_codes_na.data - A training dataset of codes (not augmented
+with ancestors) to match the documents in training_text.data.
+
+testing_codes_na.data - A testing dataset of codes (not augmented with
+ancestors) to match the documents in testing_text.data.
+
+training_indices.data - The indices of the training documents. These
+would be useful to identify the training documents in another file
+(for example, MIMIC_FILTERED_DSUMS).
+
+testing_indices.data - The indices of the testing documents.
+
+
+Instructions for its usage are as follows:
+
+usage: construct_datasets.py [-h] [-raw_text RAW_TEXT] [-raw_icd9 RAW_ICD9]
+                             [-stopwords STOPWORDS]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -raw_text RAW_TEXT    File location of the Physionet project raw text.
+  -raw_icd9 RAW_ICD9    File location containing the Physionet project raw
+                        icd9 code file.
+  -stopwords STOPWORDS  File location containing the stopword file.
+
+Verify that the file named ROOT that is created in this directory
+contains the number 5367.  If not, you will have to pass the number
+contained here as an argument to the subsequent scripts.
+
+
+
+
+IV. Hierarchical and flat SVM training and testing
+
+There exist 2 scripts for training and testing the hierarchical SVM
+and 2 scripts for training and testing the flat SVM for this task.
+
+The 2 scripts for the hierarchical SVM are called train_hsvm.py and
+test_hsvm.py.  Again, there is no need to pass this script any
+parameters unless you would like to customize the workflow.
+
+To replicate the results of the Perotte et al. paper, first run
+train_hsvm.py then test_hsvm.py followed by train_fsvm.py and then
+test_fsvm.py.  test_hsvm.py and test_fsvm.py create each create files
+that contain their respective predictions (hsvm_predictions.data and
+fsvm_predictions.data).  These files will be important later for the
+purposes of evaluating the performance of each of these classifiers.
+
+The documentation for train_hsvm.py is as follows:
+
+-------------------------------------------------------------
+
+usage: train_hsvm.py [-h] [-training_text TRAINING_TEXT]
+                     [-training_codes TRAINING_CODES] [-ICD9_tree ICD9_TREE]
+                     [-output_directory OUTPUT_DIRECTORY] [-I I] [-root ROOT]
+                     [-D D]
+
+Train Hierarchical SVM Model.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -training_text TRAINING_TEXT
+                        File location containing training text.
+  -training_codes TRAINING_CODES
+                        File location containing training codes.
+  -ICD9_tree ICD9_TREE  File location containing the ICD9 codes.
+  -output_directory OUTPUT_DIRECTORY
+                        Directory to save svm model files to.
+  -I I                  Total number of ICD9 codes. Default=7042
+  -root ROOT            Index of the root ICD9 code. Default=5367
+  -D D                  Number of training documents. Default=20533
+
+-------------------------------------------------------------
+
+The documentation for test_hsvm.py is as follows:
+
+-------------------------------------------------------------
+
+usage: test_hsvm.py [-h] [-testing_text TESTING_TEXT] [-ICD9_tree ICD9_TREE]
+                    [-output_predictions_file OUTPUT_PREDICTIONS_FILE]
+                    [-classifier_directory CLASSIFIER_DIRECTORY] [-I I]
+                    [-root ROOT] [-D D]
+
+Test Hierarchical SVM Model.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -testing_text TESTING_TEXT
+                        File location containing testing text.
+  -ICD9_tree ICD9_TREE  File location containing the ICD9 codes.
+  -output_predictions_file OUTPUT_PREDICTIONS_FILE
+                        File to save predictions to.
+  -classifier_directory CLASSIFIER_DIRECTORY
+                        Directory trained SVMs were saved to.
+  -I I                  Total number of ICD9 codes. Default=7042
+  -root ROOT            Index of the root ICD9 code. Default=5367
+  -D D                  Number of testing documents. Default=2282
+
+-------------------------------------------------------------
+
+The documentation for train_fsvm.py and test_fsvm.py are similar and
+can by seen by running the following commands at the command line:
+
+./train_fsvm.py -h
+./test_fsvm.py -h
+
+
+
+
+V. Evaluation
+
+There exists a file named evaluate_predictions.py that takes two
+arguments.  These arguments are the predictions file generated in the
+previous step for one of the classifiers and the output_directory
+where the generated evaluation figures should be saved.
+
+For those wishing to evaluate the predictions of externally generated
+predictions.  The format of the predictions is a pipe delimited file,
+one line for each document, with the icd9 code indices predicted for a
+given document on a line.  The indices for the icd9 codes can be found
+in the generated file data/MIMIC_ICD9_mapping.  This file would have
+been generated in step II as a result of running the
+construct_datasets.py script.
+
+This script will print both the tree sensitive and exact match
+sensitivity/recall, precision, and f-measure for the dataset being
+evaluated.  Also, figures for the novel tree-based evaluation metrics
+will be saved in the provided output directory and the raw data for
+these figures will also be printed to standard output.
+
+The following is the documentation for the usage of hte
+evaluate_predictions.py script.
+
+usage: evaluate_predictions.py [-h]
+                               [-testing_codes_with_ancestors TESTING_CODES_WITH_ANCESTORS]
+                               [-testing_codes_no_ancestors TESTING_CODES_NO_ANCESTORS]
+                               [-ICD9_tree ICD9_TREE] [-I I] [-root ROOT]
+                               [-D D]
+                               predictions_file output_directory
+
+Test Hierarchical SVM Model.
+
+positional arguments:
+  predictions_file      File to load predictions from.
+  output_directory      Directory to save figure to.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -testing_codes_with_ancestors TESTING_CODES_WITH_ANCESTORS
+                        File location containing testing codes that have been
+                        augmented with ancestor codes.
+  -testing_codes_no_ancestors TESTING_CODES_NO_ANCESTORS
+                        File location containing testing codes without
+                        augmentation.
+  -ICD9_tree ICD9_TREE  File location containing the ICD9 codes.
+  -I I                  Total number of ICD9 codes. Default=7042
+  -root ROOT            Index of the root ICD9 code. Default=5367
+  -D D                  Number of testing documents. Default=2282
+
+
+VI. License
+
+This software is free only for non-commercial use. It must not be
+distributed without prior permission of the author. The author is not
+responsible for implications from the use of this software.
+
+This code is provided under a dual license.  The GNU General Public
+License (GPL-3.0) for academic and other open source uses and a
+commercial license.  Please contact the author for more information
+about commercial licensing.
+
+Copyright (c) 2013, Adler Perotte
+All rights reserved.
+
+The text of the GNU General Public License that applies to this
+software can be found here: http://opensource.org/licenses/GPL-3.0

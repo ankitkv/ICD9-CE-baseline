@@ -1,0 +1,11 @@
+syntax: glob
+build
+MANIFEST
+dist
+*.patch
+*.pyc
+*.log
+*.so
+*.so.old
+*.swp
+*.dat
