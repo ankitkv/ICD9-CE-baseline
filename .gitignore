@@ -1,4 +1,8 @@
 data/
+*.pdf
+*svm_model/
+*svm_output/
+*.data
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
